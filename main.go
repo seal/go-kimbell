@@ -245,9 +245,18 @@ func main() {
 	r.HandleFunc("/", indexHandler)
 	r.HandleFunc("/posts/{url}", getPost).Methods("GET")
 	r.HandleFunc("/index.html", indexHandler)
+	r.HandleFunc("/tomorrow-night.css", func(w http.ResponseWriter, r *http.Request) {
+		css, err := os.ReadFile("tomorrow-night.css")
+		if err != nil {
+			http.Error(w, "Error reading css", http.StatusInternalServerError)
+			slog.Error(err.Error())
+		}
+		w.Header().Set("Content-Type", "text/css")
+		w.Write(css)
+	})
 	srv := &http.Server{
 		Handler:      r,
-		Addr:         "127.0.0.1:3000",
+		Addr:         "0.0.0.0:3000",
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
