@@ -246,9 +246,8 @@ func main() {
 	r.HandleFunc("/posts/{url}", getPost).Methods("GET")
 	r.HandleFunc("/index.html", indexHandler)
 	srv := &http.Server{
-		Handler: r,
-		Addr:    "127.0.0.1:8000",
-		// Good practice: enforce timeouts for servers you create!
+		Handler:      r,
+		Addr:         "127.0.0.1:3000",
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
