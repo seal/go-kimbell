@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width">
+    <title>Sqs Golang</title>
+    <link rel="canonical" href="https://kimbell.uk/">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="Will's Blog">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content>
+    <meta property="og:url" content="https://kimbell.uk/">
+    <meta name="twitter:creator" content="@bytebitter">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="/static/tomorrow-night.css">
+    <script>hljs.highlightAll();</script>
+</head>
+<style>
+    body {
+        margin-left: 25%;
+        margin-top: 5%;
+    }
+
+    @media screen and (max-width: 600px) {
+        body {
+            margin-left: 5%;
+        }
+    }
+
+    nav {
+        padding-bottom: 2%;
+    }
+
+    div {
+        padding-bottom: 2%;
+    }
+
+    a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    a:hover {
+        text-decoration: underline;
+    }
+
+    .underline {
+        text-decoration: underline;
+    }
+
+    ul {
+        list-style-type: none;
+        padding: 0;
+    }
+
+    li {
+        display: block;
+        margin-bottom: 10px;
+    }
+
+    .date {
+        color: #888;
+        margin-right: 10px;
+    }
+
+    .title {
+        display: inline;
+    }
+
+    .content-wrapper {
+        max-width: 75%;
+    }
+
+    .content-wrapper img {
+        max-width: 75%;
+        height: auto;
+    }
+</style>
+
+<body>
+    <nav>
+        <div>
+            <div><a href="/">kimbell.uk</a></div>
+        </div>
+    </nav>
+    <h4>Date: 2023-08-15</h4>
+    <div class="content-wrapper">
+        <p>I feel liked to regarding AWS
+After hearing horror story after horror story where $5,000 bills got emailed to developers at the end of the month I wrote off the idea of using any of their services.</p>
+
+<p>Having not discovered their free tier ( hence why I feel lied to ) I was creating a personal project where I would have to watch 1,000&rsquo;s of objects, with each object being &ldquo;completed&rdquo; once in an api call. My worry was CPU overloading becoming an issue.</p>
+
+<p>Having then stumbled across DreamsOfCode&rsquo;s video <a href="https://www.youtube.com/watch?v=O_0IGoOX6Dw" target="_blank">https://www.youtube.com/watch?v=O_0IGoOX6Dw</a> , I realised how large the free tier&rsquo;s large size and figured I could solve my issues using this ( lambda functions to watch 100-200 at a time)</p>
+
+<p>Initially I&rsquo;ll create four programs</p>
+
+<ul>
+<li>Send SQS</li>
+<li>Receive SQS + delete</li>
+<li>Recieve SQS in lambda</li>
+</ul>
+
+<p>GoLang is my language of choice here due to easy readability and experience.
+// main.go</p>
+
+<pre><code class="language-go">package main
+
+import (
+	&quot;context&quot;
+	&quot;fmt&quot;
+
+	&quot;github.com/aws/aws-sdk-go-v2/aws&quot;
+	&quot;github.com/aws/aws-sdk-go-v2/config&quot;
+	&quot;github.com/aws/aws-sdk-go-v2/credentials&quot;
+	&quot;github.com/aws/aws-sdk-go-v2/service/sqs&quot;
+	&quot;github.com/aws/aws-sdk-go-v2/service/sqs/types&quot;
+	&quot;github.com/seal/sqs-hello/pkg/utils&quot;
+)
+
+type SQSSendMessageAPI interface {
+	GetQueueUrl(ctx context.Context,
+		params *sqs.GetQueueUrlInput,
+		optFns ...func(*sqs.Options)) (*sqs.GetQueueUrlOutput, error)
+
+	SendMessage(ctx context.Context,
+		params *sqs.SendMessageInput,
+		optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
+}
+
+func GetQueueURL(c context.Context, api SQSSendMessageAPI, input *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
+	return api.GetQueueUrl(c, input)
+}
+func SendMsg(c context.Context, api SQSSendMessageAPI, input *sqs.SendMessageInput) (*sqs.SendMessageOutput, error) {
+	return api.SendMessage(c, input)
+}
+func main() {
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		panic(&quot;configuration error, &quot; + err.Error())
+	}
+	cfg.Region = &quot;us-east-1&quot;
+	cfg.Credentials = credentials.NewStaticCredentialsProvider(utils.EnvVariable(&quot;ACCESS_KEY&quot;), utils.EnvVariable(&quot;SECRET_KEY&quot;), &quot;&quot;)
+	client := sqs.NewFromConfig(cfg)
+
+	gQInput := &amp;sqs.GetQueueUrlInput{
+		QueueName: aws.String(&quot;q-2&quot;),
+	}
+
+	result, err := GetQueueURL(context.TODO(), client, gQInput)
+	if err != nil {
+		fmt.Println(&quot;Got an error getting the queue URL:&quot;)
+		fmt.Println(err)
+		return
+	}
+
+	queueURL := result.QueueUrl
+
+	sMInput := &amp;sqs.SendMessageInput{
+		DelaySeconds: 10,
+		MessageAttributes: map[string]types.MessageAttributeValue{
+			&quot;Name&quot;: {
+				DataType:    aws.String(&quot;String&quot;),
+				StringValue: aws.String(&quot;Bob&quot;),
+			},
+			&quot;Lambda&quot;: {
+				DataType:    aws.String(&quot;String&quot;),
+				StringValue: aws.String(&quot;Physics symbol&quot;),
+			},
+			&quot;NumberType&quot;: {
+				DataType:    aws.String(&quot;Number&quot;),
+				StringValue: aws.String(&quot;10&quot;),
+			},
+		},
+		MessageBody: aws.String(&quot;Message body regarding sqs message&quot;),
+		QueueUrl:    queueURL,
+	}
+	resp, err := SendMsg(context.TODO(), client, sMInput)
+	if err != nil {
+		fmt.Println(&quot;Got an error sending the message:&quot;)
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(&quot;Sent message with ID: &quot; + *resp.MessageId)
+
+}
+</code></pre>
+
+<p>/pkg/utils.go</p>
+
+<pre><code class="language-go">package utils
+
+import (
+	&quot;log&quot;
+	&quot;os&quot;
+
+	&quot;github.com/joho/godotenv&quot;
+)
+
+func EnvVariable(key string) string {
+	err := godotenv.Load(&quot;.env&quot;)
+	if err != nil {
+		log.Fatal(err) // Should only fail if no file is available
+	}
+	return os.Getenv(key)
+}
+
+</code></pre>
+
+<p>This was fairly simple, just sending a message using a modified version of the example code
+.env</p>
+
+<pre><code>ACCESS_KEY=XXX
+SECRET_KEY=XXX
+</code></pre>
+
+<p>The desired output is something like this (UUID&rsquo;s will differ):</p>
+
+<pre><code>Sent message with ID: 1ea4827c-c316-4cf7-b265-4eca3f52b2e1
+</code></pre>
+
+<p>Sending was just as simple:</p>
+
+<pre><code class="language-go">package main
+
+import (
+	&quot;context&quot;
+	&quot;flag&quot;
+	&quot;fmt&quot;
+	&quot;time&quot;
+
+	&quot;github.com/aws/aws-sdk-go-v2/aws&quot;
+	&quot;github.com/aws/aws-sdk-go-v2/config&quot;
+	&quot;github.com/aws/aws-sdk-go-v2/credentials&quot;
+	&quot;github.com/aws/aws-sdk-go-v2/service/sqs&quot;
+	&quot;github.com/aws/aws-sdk-go-v2/service/sqs/types&quot;
+	&quot;github.com/seal/sqs-hello/pkg/utils&quot;
+)
+
+type SQSReceiveMessageAPI interface {
+	GetQueueUrl(ctx context.Context,
+		params *sqs.GetQueueUrlInput,
+		optFns ...func(*sqs.Options)) (*sqs.GetQueueUrlOutput, error)
+
+	ReceiveMessage(ctx context.Context,
+		params *sqs.ReceiveMessageInput,
+		optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
+
+	DeleteMessage(ctx context.Context,
+		params *sqs.DeleteMessageInput,
+		optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error)
+}
+
+func GetQueueURL(c context.Context, api SQSReceiveMessageAPI, input *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
+	return api.GetQueueUrl(c, input)
+}
+
+func GetMessages(c context.Context, api SQSReceiveMessageAPI, input *sqs.ReceiveMessageInput) (*sqs.ReceiveMessageOutput, error) {
+	return api.ReceiveMessage(c, input)
+}
+func main() {
+
+	queue := flag.String(&quot;q&quot;, &quot;&quot;, &quot;The name of the queue&quot;)
+	timeout := flag.Int(&quot;t&quot;, 5, &quot;How long, in seconds, that the message is hidden from others&quot;)
+
+	delete := flag.Bool(&quot;d&quot;, false, &quot;Do you want to delete the messages after reading&quot;)
+	flag.Parse()
+	if *queue == &quot;&quot; {
+		fmt.Println(&quot;You must supply the name of a queue (-q QUEUE)&quot;)
+		return
+	}
+
+	if *timeout &lt; 0 {
+		*timeout = 0
+	}
+
+	if *timeout &gt; 12*60*60 {
+		*timeout = 12 * 60 * 60
+	}
+
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		panic(&quot;configuration error, &quot; + err.Error())
+	}
+
+	cfg.Region = *aws.String(&quot;us-east-1&quot;)
+
+	cfg.Credentials = credentials.NewStaticCredentialsProvider(utils.EnvVariable(&quot;ACCESS_KEY&quot;), utils.EnvVariable(&quot;SECRET_KEY&quot;), &quot;&quot;)
+
+	client := sqs.NewFromConfig(cfg)
+	gQInput := &amp;sqs.GetQueueUrlInput{
+		QueueName: queue,
+	}
+
+	urlResult, err := GetQueueURL(context.TODO(), client, gQInput)
+	if err != nil {
+		fmt.Println(&quot;Got an error getting the queue URL:&quot;)
+		fmt.Println(err)
+		return
+	}
+
+	queueURL := urlResult.QueueUrl
+	gMInput := &amp;sqs.ReceiveMessageInput{
+		QueueUrl: queueURL,
+		AttributeNames: []types.QueueAttributeName{
+			&quot;SentTimestamp&quot;,
+		},
+		MaxNumberOfMessages: 10,
+		MessageAttributeNames: []string{
+			&quot;Name&quot;,
+			&quot;Lambda&quot;,
+			&quot;NumberType&quot;,
+		},
+
+		WaitTimeSeconds: int32(5),
+	}
+	for {
+
+		msgResult, err := GetMessages(context.TODO(), client, gMInput)
+		if err != nil {
+			fmt.Println(&quot;Got an error receiving messages:&quot;)
+			fmt.Println(err)
+			return
+		}
+
+		if msgResult.Messages != nil {
+			for _, message := range msgResult.Messages {
+				fmt.Println(&quot;Message ID:     &quot; + *message.MessageId)
+				fmt.Println(&quot;Message Handle: &quot; + *message.ReceiptHandle)
+				fmt.Println(&quot;Timestamp&quot; + message.Attributes[&quot;SentTimestamp&quot;])
+				// Accessing specific message attributes
+				for attrName, attrValue := range message.MessageAttributes {
+					fmt.Printf(&quot;Attribute Name: %s\n&quot;, attrName)
+					fmt.Printf(&quot;Attribute Value: %s\n&quot;, *attrValue.StringValue)
+					fmt.Printf(&quot;Attribute DataType: %s\n&quot;, *attrValue.DataType)
+				}
+				fmt.Println(&quot;Body:&quot;, *message.Body)
+				if *delete {
+					dMInput := &amp;sqs.DeleteMessageInput{
+						QueueUrl:      queueURL,
+						ReceiptHandle: message.ReceiptHandle,
+					}
+					_, err = RemoveMessage(context.TODO(), client, dMInput)
+					if err != nil {
+						fmt.Println(&quot;Got an error deleting the message:&quot;)
+						fmt.Println(err)
+						return
+					} else {
+						fmt.Println(&quot;Deleted message with handler &quot; + *message.ReceiptHandle)
+					}
+				}
+			}
+		} else {
+			fmt.Println(&quot;No messages found, trying again in 10 seconds&quot;)
+			time.Sleep(10 * time.Second)
+		}
+	}
+
+}
+
+func RemoveMessage(c context.Context, api SQSReceiveMessageAPI, input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
+	return api.DeleteMessage(c, input)
+}
+
+</code></pre>
+
+<p>Running this via</p>
+
+<pre><code>go run . -q=&quot;q-2&quot; -d=true
+</code></pre>
+
+<p>We receive :</p>
+
+<pre><code>Message ID:     1ea4827c-c316-4cf7-b265-4eca3f52b2e1
+Message Handle: AQEBXSZRwAN5a4h8D0oXpoQ9WItjbd7ZZGG66ZeKcIWjOMUxkG28Z6K9iG6WFa6giAM5w3Yt1v/qLhvO38gZNuwm6aV8g5CxIm6TsAEGNkmHWz2sgv/aiDiTUIahD5JbrfAIVPDFVGNMFth9FBL80wQDeWmxLg8Ha3+QMkB6wh8XC7Bps5AwkeLXjg2o4w/u4TlSxXdCkQttbTW2dKiCujTxzvQ5q/SYi5pnH95UD/3ef4n1W3KOCmTswQVZKrdRDyougdXD+9ZLSd1D85zUPTO1PGofscvgf8n7KSyoRepl/tjb6V5dI3u00ckclk90V+dFu0pMZBbg3/N9AfReOGBmJGcl6VsCleGbKeTI/8X84imWj53AlYc1DRM0SpBOGVr
+Timestamp1694527359000
+Attribute Name: Lambda
+Attribute Value: Physics symbol
+Attribute DataType: String
+Attribute Name: Name
+Attribute Value: Bob
+Attribute DataType: String
+Attribute Name: NumberType
+Attribute Value: 10
+Attribute DataType: Number
+Body: Message body regarding sqs message
+Deleted message with handler AQEBXSZRwAN5a4h8D0oXpoQ9WItjbd7ZZGG66ZeKcIWjOMUxkG28Z6K9iG6WFa6giAM5w3Yt1v/qLhvO38gZNuwm6aV8g5CxImAEGNkmHWz2sgv/aiDiTUIahD5JbrfAIVPDFVGNMFth9FBL80wQDeWmxLg8Ha3+QMkB6wh8XC7Bps5AwkeLXjg2o4w/u4TlSxXdCkQttbTW2dKiCujTxzvQ5q/SYi5pnH95UD/3ef4n1W3KOCmTswQVZKrdRDyougdXD+9ZLSd1D85zUPTO1PGoFcvgmQf8n7KSyoRepl/tjb6V5dI3u00ckclk90V+dFu0pMZBbg3/N9AfReOGBmJGcl6VsCleGbKeTI/8X84imWj53AlYc1DRM0SpBOGVr
+</code></pre>
+
+<p>This is interesting, but now I wanted to move this to work with a lambda function, to process the data</p>
+
+<p>Create a lambda function with</p>
+
+<ul>
+<li>x86 instruction set</li>
+<li>Author from scratch set to true</li>
+<li>Runtime set to go 1.X</li>
+</ul>
+
+<p>Set the handler inside runtime settings to build/main
+Then proceed to create main.go inside cmd/main.go
+main.go:</p>
+
+<pre><code class="language-go">package main
+
+import (
+	&quot;context&quot;
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+	&quot;github.com/aws/aws-lambda-go/events&quot;
+	&quot;github.com/aws/aws-lambda-go/lambda&quot;
+	&quot;log&quot;
+)
+
+type Response struct {
+	Name       string `json:&quot;author&quot;`
+	Lambda     string `json:&quot;title&quot;`
+	NumberType string `json:&quot;numberType&quot;`
+	TimeStamp  string `json:&quot;timeStamp&quot;`
+}
+
+func handler(ctx context.Context, sqsEvent events.SQSEvent) error {
+	var records []Response
+	for _, message := range sqsEvent.Records {
+		fmt.Printf(&quot;The message %s for event source %s = %s \n&quot;, message.MessageId, message.EventSource, message.Body)
+		records = append(records, Response{
+			Name:       *message.MessageAttributes[&quot;Name&quot;].StringValue,
+			NumberType: *message.MessageAttributes[&quot;NumberType&quot;].StringValue,
+			Lambda:     *message.MessageAttributes[&quot;Lambda&quot;].StringValue,
+			TimeStamp:  message.Attributes[&quot;TimeStamp&quot;],
+		})
+	}
+	body, err := json.Marshal(records)
+	if err != nil {
+		return err
+	}
+	log.Println(string(body))
+	return nil
+}
+func main() {
+	lambda.Start(handler)
+}
+
+</code></pre>
+
+<p>I also setup this build script for easy builds.</p>
+
+<p>Notice building for the x86 architecture and disabling CGO, as this appeared to not work for me</p>
+
+<pre><code class="language-sh">GOOS=linux CGO_ENABLED=0 go build -o build/main cmd/main.go
+echo &quot;Built&quot;
+zip build/main.zip build/main
+</code></pre>
+
+<p>(Inside the lambda function, go to configuration and permissions, then create a role inside IAM manager that allows <code>AmazonSQSFullAccess</code>  and add it to the lambda function)</p>
+
+<p>Then add the sqs as a trigger for your function</p>
+
+<p>Upload your file to the console ( the zip created in build/)</p>
+
+<p>Also here I had an issue where the role I created couldn&rsquo;t write to CloudWatch logs
+After editing the role to have  the correct permissions it worked</p>
+
+<pre><code>Your function doesn't have permission to write to Amazon CloudWatch Logs. To view logs, add the **AWSLambdaBasicExecutionRole** managed policy to its execution role. [Open the IAM console]
+</code></pre>
+
+<p>Now if we run our send code again, we can see that inside CloudWatch logs we have the following output:</p>
+
+<pre><code>2023/09/12 14:22:32 [{
+    &quot;author&quot;: &quot;Bob&quot;,
+    &quot;title&quot;: &quot;Physics symbol&quot;,
+    &quot;numberType&quot;: &quot;10&quot;,
+    &quot;timeStamp&quot;: &quot;&quot;
+}]
+
+</code></pre>
+
+<p>Congratulations, you just wrote code to send an SQS message and receive it in a lambda function</p>
+
+    </div>
+    <p> <a href="/">Back home </a>
+</body>
+
+</html>

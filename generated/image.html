@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width">
+    <title>Rust Image service</title>
+    <link rel="canonical" href="https://kimbell.uk/">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="Will's Blog">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content>
+    <meta property="og:url" content="https://kimbell.uk/">
+    <meta name="twitter:creator" content="@bytebitter">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="/static/tomorrow-night.css">
+    <script>hljs.highlightAll();</script>
+</head>
+<style>
+    body {
+        margin-left: 25%;
+        margin-top: 5%;
+    }
+
+    @media screen and (max-width: 600px) {
+        body {
+            margin-left: 5%;
+        }
+    }
+
+    nav {
+        padding-bottom: 2%;
+    }
+
+    div {
+        padding-bottom: 2%;
+    }
+
+    a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    a:hover {
+        text-decoration: underline;
+    }
+
+    .underline {
+        text-decoration: underline;
+    }
+
+    ul {
+        list-style-type: none;
+        padding: 0;
+    }
+
+    li {
+        display: block;
+        margin-bottom: 10px;
+    }
+
+    .date {
+        color: #888;
+        margin-right: 10px;
+    }
+
+    .title {
+        display: inline;
+    }
+
+    .content-wrapper {
+        max-width: 75%;
+    }
+
+    .content-wrapper img {
+        max-width: 75%;
+        height: auto;
+    }
+</style>
+
+<body>
+    <nav>
+        <div>
+            <div><a href="/">kimbell.uk</a></div>
+        </div>
+    </nav>
+    <h4>Date: 2024-1-30</h4>
+    <div class="content-wrapper">
+        <p>Having just re-written this site, I needed a way to host images, which I quickly realized after uploading my first post, only to be greeted with ![[Pasted Image XXXXX]] from my use of obsidian.</p>
+
+<p>Repo link:
+<a href="https://github.com/seal/img.kimbell.uk" target="_blank">Link</a></p>
+
+<p>First off we start with a basic rust project, using</p>
+
+<pre><code>cargo new image-tool
+</code></pre>
+
+<p>Then running</p>
+
+<pre><code>cargo add dotenv env_logger tide 
+cargo add async-std --features=&quot;attributes&quot;
+cargo add tokio --features=&quot;full&quot;
+</code></pre>
+
+<p>for our dependencies .</p>
+
+<p>Our main.rs will look like this:</p>
+
+<pre><code class="language-rust">use crate::handlers::upload;
+use dotenv::dotenv;
+use std::io::ErrorKind;
+use tide::log::error;
+use tide::log::info;
+use tide::log::LevelFilter;
+use tide::utils::After;
+mod handlers;
+use env_logger;
+use tide::Response;
+use tide::StatusCode;
+
+#[async_std::main]
+async fn main() -&gt; tide::Result&lt;()&gt; {
+    env_logger::builder()
+        .filter_level(LevelFilter::Debug)
+        .init();
+
+    info!(&quot;Initialising...&quot;);
+    if let Err(e) = async_std::fs::create_dir_all(&quot;./images&quot;).await {
+        eprintln!(&quot;Error creating 'images' directory: {}&quot;, e);
+        return Err(tide::Error::from_str(
+            StatusCode::InternalServerError,
+            &quot;Internal Server Error&quot;,
+        ));
+    }
+    dotenv().ok();
+    std::env::var(&quot;DOMAIN&quot;).expect(&quot;No domain env variable set&quot;);
+    std::env::var(&quot;API_KEY&quot;).expect(&quot;No api-key env variable set&quot;);
+    info!(&quot;Env vars OK&quot;);
+    let mut app = tide::new();
+    app.with(tide::log::LogMiddleware::new());
+    app.with(After(|mut res: Response| async {
+        if let Some(err) = res.downcast_error::&lt;async_std::io::Error&gt;() {
+            match err.kind() {
+                ErrorKind::NotFound =&gt; {
+                    error!(&quot;{:?}&quot;, err);
+                    let msg = format!(&quot;Error: {:?}&quot;, err);
+                    res.set_status(StatusCode::NotFound);
+                    res.set_body(msg);
+                }
+                _ =&gt; {
+                    error!(&quot;{:?}&quot;, err);
+                    let msg = format!(&quot;Internal Server Error: {:?}&quot;, err);
+                    res.set_status(StatusCode::InternalServerError);
+                    res.set_body(msg);
+                }
+            }
+        }
+        Ok(res)
+    }));
+
+    app.at(&quot;/new/:file&quot;).put(upload);
+    app.at(&quot;/&quot;).serve_dir(&quot;images/&quot;)?;
+    info!(&quot;Created Routes&quot;);
+    app.listen(&quot;0.0.0.0:3001&quot;).await?;
+    Ok(())
+}
+
+</code></pre>
+
+<p>A route for file upload, and an endpoint to serve images.</p>
+
+<p>Our handlers.rs will look like this:</p>
+
+<pre><code class="language-rust">use async_std::fs::OpenOptions;
+use async_std::io;
+use tide::prelude::json;
+use tide::{log::info, Request};
+use tide::{Response, StatusCode};
+
+/// Handles image upload.
+pub async fn upload(req: Request&lt;()&gt;) -&gt; tide::Result {
+    // Retrieve API key from environment variables
+    let api_key = std::env::var(&quot;API_KEY&quot;).expect(&quot;API_KEY not found in .env&quot;);
+
+    // Retrieve the provided API key from the request headers
+    let provided_key: String = req
+        .header(&quot;API-KEY&quot;)
+        .map(|header_values| header_values.as_str().to_string())
+        .unwrap_or_else(|| &quot;na&quot;.to_string());
+
+    // Check if the provided API key is valid
+    if provided_key == api_key {
+        // Extract file path from the request parameters
+        let path = req.param(&quot;file&quot;)?.to_string().clone();
+
+        // Build the file system path
+        let fs_path = format!(&quot;./images/{}&quot;, path);
+
+        // Open the file for writing
+        let file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&amp;fs_path)
+            .await?;
+
+        // Copy the request body (file content) to the opened file
+        let bytes_written = io::copy(req, file).await?;
+
+        // Log information about the uploaded file
+        info!(&quot;file written&quot;, {
+            bytes: bytes_written,
+            path: fs_path,
+        });
+
+        // Retrieve domain from environment variables
+        let domain = std::env::var(&quot;DOMAIN&quot;).expect(&quot;No domain env variable set&quot;);
+
+        // Create a JSON response with the generated image URL
+        let mut response = Response::new(StatusCode::InternalServerError);
+        response.insert_header(&quot;Content-Type&quot;, &quot;application/json&quot;);
+        response.insert_header(&quot;Access-Control-Allow-Origin&quot;, &quot;*&quot;);
+        response.set_body(json!({
+            &quot;file&quot;: format!(&quot;{}/{}&quot;, domain, path),
+        }));
+
+        return Ok(response);
+    }
+
+    // Handle unauthorized access with a JSON response
+    let response_json = json!({
+        &quot;message&quot;: &quot;Unauthorized. Invalid API key&quot;,
+    });
+    let mut response = Response::new(StatusCode::Unauthorized);
+    response.insert_header(&quot;Content-Type&quot;, &quot;application/json&quot;);
+    response.insert_header(&quot;Access-Control-Allow-Origin&quot;, &quot;*&quot;);
+    response.set_body(response_json);
+
+    Ok(response)
+}
+</code></pre>
+
+<p>We will be using an api-key from a .env file to avoid too many complications.</p>
+
+<h3 id="bash">Bash</h3>
+
+<p>Now that our code is written, calling said image-api is slightly more complicated.</p>
+
+<p>Currently I use flameshot GUI to take images and then I copy to clipboard, I wanted to retain this functionality so I wrote an upload script to do this for me.</p>
+
+<p>Steps:</p>
+
+<ul>
+<li>Open flameshot GUI</li>
+<li>We take our screenshot</li>
+<li>Copy to clipboard</li>
+<li>Create a temporary file</li>
+<li>Curl &ldquo;put&rdquo; our file to our domain</li>
+<li>Copy the json response to our clipboard using jq to get the &ldquo;file&rdquo; attribute</li>
+</ul>
+
+<p>Here&rsquo;s the finished product:</p>
+
+<pre><code class="language-bash">#!/bin/bash
+
+if ! command -v xclip &amp;&gt; /dev/null; then
+    notify-send &quot;Error: xclip is not installed. Please install it first.&quot;
+    exit 1
+fi
+
+flameshot_cmd=&quot;flameshot gui&quot;
+$flameshot_cmd
+
+temp_file=$(mktemp /tmp/XXXXXX.png)
+xclip -selection clipboard -t image/png -o &gt; &quot;$temp_file&quot;
+
+if [ ! -s &quot;$temp_file&quot; ]; then
+    notify-send &quot;Error: Temporary file does not contain an image. Exiting.&quot;
+    rm &quot;$temp_file&quot;  
+    exit 1
+fi
+
+upload_url=&quot;PLACEHOLDER_DOMAIN&quot;
+api_key=&quot;PLACEHOLDER_API_KEY&quot;
+
+response=$(curl -s -H &quot;API-KEY: $api_key&quot; -T &quot;$temp_file&quot; &quot;$upload_url/new/&quot;)
+image_url=$(echo &quot;$response&quot; | jq -r '.file')
+
+echo -n &quot;$image_url&quot; | xclip -selection clipboard
+
+notify-send &quot;Screenshot Uploaded&quot; &quot;Server Response copied to clipboard.&quot;
+
+rm &quot;$temp_file&quot;
+</code></pre>
+
+<p>Now we need to create our .env file with two variables:</p>
+
+<pre><code>DOMAIN=https://DOMAIN.COM
+API_KEY=API-KEY-HERE
+</code></pre>
+
+<p>Then for other&rsquo;s ease of use, we create a setup script so they can easily modify the upload script.</p>
+
+<pre><code class="language-bash">#!/bin/bash
+
+# Read the domain from .env file
+if [ -f .env ]; then
+    source .env
+else
+    echo &quot;Error: .env file not found.&quot;
+    exit 1
+fi
+
+# Set the domain &amp; api-key in upload.sh
+sed -i &quot;s|PLACEHOLDER_DOMAIN|$DOMAIN|&quot; ./upload.sh
+sed -i &quot;s|PLACEHOLDER_API_KEY|$API_KEY|&quot; ./upload.sh
+
+echo &quot;Domain &amp; api-key set in upload.sh: $DOMAIN , $API_KEY&quot;
+</code></pre>
+
+<p>Now we run:</p>
+
+<pre><code>chmod +x upload.sh &amp;&amp; chmod +x setup.sh
+</code></pre>
+
+<p>After uploading our code to our server, in my case <a href="https://img.kimbell.uk" target="_blank">https://img.kimbell.uk</a> , we can run the setup script and start editing our i3 config.</p>
+
+<h3 id="adding-to-i3">Adding to i3</h3>
+
+<pre><code>cp ./upload.sh ~/.config/i3/
+</code></pre>
+
+<p>Added to ~/.config/i3/config:</p>
+
+<pre><code>bindsym $mod+a exec --no-startup-id ~/.config/i3/upload.sh
+</code></pre>
+
+<p>Then with a re-loading of our i3 config, when I take a screenshot and copy to clipboard, our image will be uploaded and our URL copied to clipboard.</p>
+
+<h3 id="nginx-file-size">Nginx file-size</h3>
+
+<p>Nginx has a default limit of size, that you need to alter to allow for large-photo&rsquo;s to be sent.</p>
+
+<p>Inside:</p>
+
+<pre><code>/etc/nginx/nginx.conf
+</code></pre>
+
+<p>Add this inside the http block:</p>
+
+<pre><code>client_max_body_size 100M;
+</code></pre>
+
+<p>Now this is done, we can upload large-images like this :)</p>
+
+<p><img src="https://img.kimbell.uk/flameshot_image_8Q5MBX.png" alt="https://img.kimbell.uk/flameshot_image_8Q5MBX.png" /></p>
+
+<p>All in all this was a fairly quick program to write, this is my second application using <a href="https://github.com/http-rs/tide" target="_blank">Tide</a> and it will not be my last.</p>
+
+    </div>
+    <p> <a href="/">Back home </a>
+</body>
+
+</html>

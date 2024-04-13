@@ -82,6 +82,13 @@ func newPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("New post created successfully", slog.String("request-id", reqID), slog.String("title", post.Title))
+	err = generatePosts()
+	if err != nil {
+		http.Error(w, "Internal Server Error: Failed to regenerate posts", http.StatusInternalServerError)
+		slog.Error("Failed to regenerate posts", err, slog.String("request-id", reqID))
+		return
+	}
+
 	w.WriteHeader(http.StatusCreated)
 	changed = true
 }
@@ -144,6 +151,12 @@ func parseIndex() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 func indexInitial() {
+	err := generatePosts()
+	if err != nil {
+		slog.Error("Failed to generate posts", err)
+		return
+	}
+
 	templateText, err := parseIndex()
 	if err != nil {
 		panic(err)
@@ -169,54 +182,69 @@ func getPost(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	postURL := vars["url"]
 
-	jsonFileName := filepath.Join("posts", postURL+".json")
-	jsonData, err := os.ReadFile(jsonFileName)
+	htmlFileName := filepath.Join("generated", postURL+".html")
+	htmlContent, err := os.ReadFile(htmlFileName)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		slog.Error(err.Error(), slog.String("url", postURL))
+		if os.IsNotExist(err) {
+			http.Error(w, "Post not found", http.StatusNotFound)
+			slog.Error("Post not found", slog.String("url", postURL))
+		} else {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			slog.Error("Failed to read generated post", err, slog.String("url", postURL))
+		}
 		return
 	}
 
-	var post Post
-	err = json.Unmarshal(jsonData, &post)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		slog.Error(err.Error(), slog.String("url", postURL))
-		return
-	}
-
-	markdownFileName := filepath.Join("posts", postURL+".md")
-	markdownData, err := os.ReadFile(markdownFileName)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		slog.Error(err.Error(), slog.String("url", postURL))
-		return
-	}
-
-	htmlContent := mdToHTML(markdownData)
-
-	tem, err := os.ReadFile("templates/post.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		slog.Error(err.Error(), slog.String("url", postURL))
-		return
-	}
-	tmpl := template.Must(template.New("post").Parse(string(tem)))
 	w.Header().Set("Content-Type", "text/html")
-	err = tmpl.Execute(w, struct {
-		Title   string
-		Date    string
-		Content template.HTML
-	}{
-		Title:   post.Title,
-		Date:    post.Date,
-		Content: template.HTML(htmlContent),
-	})
+	w.Write(htmlContent)
+}
+func generatePosts() error {
+	posts, err := getPosts()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		slog.Error(err.Error(), slog.String("url", postURL))
-		return
+		return err
 	}
+
+	err = os.MkdirAll("generated", os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	for _, post := range posts {
+		markdownFileName := filepath.Join("posts", post.Url+".md")
+		markdownData, err := os.ReadFile(markdownFileName)
+		if err != nil {
+			return err
+		}
+
+		htmlContent := mdToHTML(markdownData)
+
+		tem, err := os.ReadFile("templates/post.html")
+		if err != nil {
+			return err
+		}
+		tmpl := template.Must(template.New("post").Parse(string(tem)))
+		var buf bytes.Buffer
+		err = tmpl.Execute(&buf, struct {
+			Title   string
+			Date    string
+			Content template.HTML
+		}{
+			Title:   post.Title,
+			Date:    post.Date,
+			Content: template.HTML(htmlContent),
+		})
+		if err != nil {
+			return err
+		}
+
+		htmlFileName := filepath.Join("generated", post.Url+".html")
+		err = os.WriteFile(htmlFileName, buf.Bytes(), 0644)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 func mdToHTML(md []byte) []byte {
 	extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock

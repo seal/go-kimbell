@@ -76,3 +76,9 @@
 {"time":"2024-04-11T22:58:33.271741994+01:00","level":"INFO","msg":"Index hit"}
 {"time":"2024-04-11T22:58:37.305916954+01:00","level":"INFO","msg":"Starting server"}
 {"time":"2024-04-11T22:58:38.628389091+01:00","level":"INFO","msg":"Index hit"}
+{"time":"2024-04-13T13:37:01.261715811+01:00","level":"INFO","msg":"Starting server"}
+{"time":"2024-04-13T13:37:09.860229876+01:00","level":"INFO","msg":"Index hit"}
+{"time":"2024-04-13T13:37:11.974682203+01:00","level":"ERROR","msg":"Post not found","url":"image"}
+{"time":"2024-04-13T13:38:29.378753269+01:00","level":"INFO","msg":"Starting server"}
+{"time":"2024-04-13T13:38:45.018950352+01:00","level":"INFO","msg":"Index hit"}
+{"time":"2024-04-13T13:39:10.399433284+01:00","level":"INFO","msg":"Starting server"}

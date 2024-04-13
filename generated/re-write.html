@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width">
+    <title>Blog Rewrite</title>
+    <link rel="canonical" href="https://kimbell.uk/">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="Will's Blog">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content>
+    <meta property="og:url" content="https://kimbell.uk/">
+    <meta name="twitter:creator" content="@bytebitter">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="/static/tomorrow-night.css">
+    <script>hljs.highlightAll();</script>
+</head>
+<style>
+    body {
+        margin-left: 25%;
+        margin-top: 5%;
+    }
+
+    @media screen and (max-width: 600px) {
+        body {
+            margin-left: 5%;
+        }
+    }
+
+    nav {
+        padding-bottom: 2%;
+    }
+
+    div {
+        padding-bottom: 2%;
+    }
+
+    a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    a:hover {
+        text-decoration: underline;
+    }
+
+    .underline {
+        text-decoration: underline;
+    }
+
+    ul {
+        list-style-type: none;
+        padding: 0;
+    }
+
+    li {
+        display: block;
+        margin-bottom: 10px;
+    }
+
+    .date {
+        color: #888;
+        margin-right: 10px;
+    }
+
+    .title {
+        display: inline;
+    }
+
+    .content-wrapper {
+        max-width: 75%;
+    }
+
+    .content-wrapper img {
+        max-width: 75%;
+        height: auto;
+    }
+</style>
+
+<body>
+    <nav>
+        <div>
+            <div><a href="/">kimbell.uk</a></div>
+        </div>
+    </nav>
+    <h4>Date: 2023-06-08</h4>
+    <div class="content-wrapper">
+        <h1 id="intro">Intro</h1>
+
+<p>When I initially wrote the code for this site, it was to create a better solution than something like <a href="https://gohugo.io/" target="_blank">Hugo</a> but after a day of bashing up my first http-server in Rust, it was botched, and not my best work, but it <em>worked</em></p>
+
+<p>Using axum, Postgres &amp; static HTML it lacked many things, but longevity was my main concern.</p>
+
+<p>For example, to create a new post I had to open up post-man, due to my lack of knowledge of tools such as clap, and had no containerization.</p>
+
+<p>It wasn&rsquo;t my best work.</p>
+
+<h2 id="design">Design</h2>
+
+<p><img src="https://img.kimbell.uk/flameshot_image_t3ho4q.png" alt="https://img.kimbell.uk/flameshot_image_t3ho4q.png" /></p>
+
+<p>Simple yet effective, Docker &amp; Nginx behind Tide.
+<img src="https://img.kimbell.uk/flameshot_image_y5zfxa.png" alt="https://img.kimbell.uk/flameshot_image_y5zfxa.png" />
+The CLI-tool, the same again, simply a new post option, or delete</p>
+
+<h2 id="tech-stack">Tech Stack</h2>
+
+<p>After being inspired by a DreamsOfCode <a href="https://www.youtube.com/watch?v=ZbhzLP3vnkg" target="_blank">video</a>,I decided on <a href="https://github.com/http-rs/tide" target="_blank">Tide</a> for my http-server for it&rsquo;s seemingly go-like syntax and inner-workings.
+Leaving me with:</p>
+
+<ul>
+<li><a href="https://github.com/http-rs/tide" target="_blank">Tide</a></li>
+<li><a href="https://vuejs.org/" target="_blank">Vue</a></li>
+<li>Sqlite3</li>
+<li><a href="https://github.com/launchbadge/sqlx" target="_blank">Sqlx</a></li>
+<li>Docker</li>
+</ul>
+
+<h2 id="issues">Issues</h2>
+
+<p>There was no lack of issues I encountered, varying with frustration as my project went along&hellip;</p>
+
+<h4 id="uuid-s">UUID&rsquo;s</h4>
+
+<p>With my sqlx migration being this file:</p>
+
+<pre><code class="language-sql">-- migrations/1_initial_setup.sql
+
+CREATE TABLE posts (
+    id UUID NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
+</code></pre>
+
+<p>And my model being:</p>
+
+<pre><code class="language-rust">use sqlx::types::Uuid;
+#[derive(sqlx::FromRow, Serialize)]
+pub struct Post {
+    pub id: Uuid,
+    pub title: String,
+    pub created_at: i64,
+}
+</code></pre>
+
+<p>When creating a post via:</p>
+
+<pre><code class="language-rust">        let inserted_post = sqlx::query_as!(
+    Post,
+    r#&quot;INSERT INTO posts (id, title, created_at) VALUES (?, ?, ?) RETURNING id, title, created_at&quot;#,
+    id,
+    new_post.title,
+    new_post.created_at
+)
+</code></pre>
+
+<p>I encountered a sqlx error:</p>
+
+<pre><code># `unsupported type NULL of column #1`
+</code></pre>
+
+<p>After some digging I eventually sorted this issue via <a href="https://github.com/launchbadge/sqlx/issues/1350" target="_blank">this GitHub issue</a></p>
+
+<ul>
+<li><p>This would later bite me in the ass, as UUID&rsquo;s were being store inside the database as &ldquo;OK[I3%&rdquo;, so I would revert this.</p>
+
+<h4 id="docker">Docker&hellip;</h4>
+
+<p>Containerizing my code was not a huge issue, but <em>optimizing it</em> proved to be a much harder challenge, with 5 minute builds locally, and missing dependencies left right and center, I had to battle with docker for many hours, and eventually settled on this:</p></li>
+</ul>
+
+<pre><code class="language-Dockerfile"># Use a smaller base image for the builder stage
+FROM rust:slim as builder
+
+WORKDIR /app
+
+COPY . .
+COPY .env .
+
+# Install build dependencies
+RUN apt-get update &amp;&amp; \
+    apt-get install -y pkg-config libssl-dev perl make musl-tools 
+
+# Add only the necessary target for the build
+RUN rustup target add x86_64-unknown-linux-musl
+
+# Build the application
+RUN cargo build --release --target=x86_64-unknown-linux-musl &amp;&amp; \
+    strip target/x86_64-unknown-linux-musl/release/kimbell
+
+
+# Use a smaller base image for the final stage
+FROM alpine:3.14
+
+WORKDIR /app
+
+# Copy only the necessary files from the builder stage
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/kimbell /app/
+COPY database.sqlite /app/
+COPY dist /app/dist
+COPY md_files /app/md_files
+
+EXPOSE 3000
+
+CMD [&quot;./kimbell&quot;]
+
+</code></pre>
+
+<p>Whilst more optimizations could take place, my sanity might be lost in the meantime.</p>
+
+<p>Coming from Go, and it being my primary, and only language I would describe myself as advanced in from 2018-2020, combining rust&rsquo;s slow builds + a docker build step is excruciating to say the least..</p>
+
+<h4 id="nginx-s-headers">Nginx&rsquo;s headers</h4>
+
+<p>I&rsquo;ve setup my fair share of static JS sites using Nginx, or using the reverse-proxy feature to send requests to an Express JS server. One thing I had never used, due to the simplicity of the site&rsquo;s I have made, was headers.</p>
+
+<p>After creating my CLI-tool to create and delete posts, the API-hey in the header &ldquo;api-key&rdquo; was not working&hellip;.
+After many hours of confusion, googling and frustration, I realized NGINX removes headers with _&rsquo;s in by default&hellip;</p>
+
+<p>I promptly changed all occurrences of said underscore, then promptly forgot <em>one</em> of them and continued to debug for hours, exciting&hellip;</p>
+
+<h2 id="code">Code</h2>
+
+<p>Main.rs:</p>
+
+<pre><code class="language-rust">use crate::handlers::{create_post, delete_post, get_post, get_posts};
+use dotenv::dotenv;
+use std::io::ErrorKind;
+use tide::log::error;
+use tide::log::info;
+use tide::log::LevelFilter;
+use tide::utils::After;
+mod handlers;
+mod models;
+use env_logger;
+use sqlx::sqlite::SqlitePoolOptions;
+use std::env;
+use tide::Response;
+use tide::StatusCode;
+
+#[derive(Clone)]
+pub struct State {
+    db_pool: sqlx::SqlitePool,
+}
+
+#[async_std::main]
+async fn main() -&gt; tide::Result&lt;()&gt; {
+    env_logger::builder()
+        .filter_level(LevelFilter::Debug)
+        .init();
+
+    info!(&quot;Initialising...&quot;);
+    if let Err(e) = async_std::fs::create_dir_all(&quot;./md_files&quot;).await {
+        eprintln!(&quot;Error creating 'md_files' directory: {}&quot;, e);
+        return Err(tide::Error::from_str(
+            StatusCode::InternalServerError,
+            &quot;Internal Server Error&quot;,
+        ));
+    }
+    dotenv().ok();
+    info!(&quot;Env vars OK&quot;);
+    let database_url = env::var(&quot;DATABASE_URL&quot;).expect(&quot;DB URL NOT SET&quot;);
+    let db_pool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&amp;database_url)
+        .await?;
+    let state = State { db_pool };
+    let mut app = tide::with_state(state);
+    app.with(tide::log::LogMiddleware::new());
+    info!(&quot;DB Connection OK&quot;);
+    app.with(After(|mut res: Response| async {
+        if let Some(err) = res.downcast_error::&lt;async_std::io::Error&gt;() {
+            match err.kind() {
+                ErrorKind::NotFound =&gt; {
+                    error!(&quot;{:?}&quot;, err);
+                    let msg = format!(&quot;Error: {:?}&quot;, err);
+                    res.set_status(StatusCode::NotFound);
+                    res.set_body(msg);
+                }
+                _ =&gt; {
+                    error!(&quot;{:?}&quot;, err);
+                    let msg = format!(&quot;Internal Server Error: {:?}&quot;, err);
+                    res.set_status(StatusCode::InternalServerError);
+                    res.set_body(msg);
+                }
+            }
+        }
+        Ok(res)
+    }));
+
+    app.at(&quot;/api/posts&quot;).get(get_posts);
+    app.at(&quot;/api/posts&quot;).post(create_post);
+    app.at(&quot;/api/posts/:uuid&quot;).delete(delete_post);
+    app.at(&quot;/api/post/:id&quot;).get(get_post);
+    app.at(&quot;/posts&quot;).serve_file(&quot;dist/index.html&quot;)?;
+    app.at(&quot;/post/:id&quot;).serve_file(&quot;dist/index.html&quot;)?;
+    app.at(&quot;/&quot;).serve_file(&quot;dist/index.html&quot;)?;
+    app.at(&quot;/index.html&quot;).serve_file(&quot;dist/index.html&quot;)?;
+    app.at(&quot;/assets/&quot;).serve_dir(&quot;dist/assets/&quot;)?;
+    info!(&quot;Created Routes&quot;);
+    app.listen(&quot;0.0.0.0:3000&quot;).await?;
+    Ok(())
+}
+</code></pre>
+
+<p>handlers.rs</p>
+
+<pre><code class="language-rust">pub async fn get_posts(req: Request&lt;State&gt;) -&gt; tide::Result {
+    let db_pool = &amp;req.state().db_pool;
+
+    let posts = query_as!(Post, r#&quot;SELECT id, title, created_at FROM posts&quot;#)
+        .fetch_all(db_pool)
+        .await?;
+
+    let response_json = json!({
+        &quot;info&quot;: { &quot;count&quot;: posts.len() },
+        &quot;posts&quot;: posts,
+    });
+
+    let mut response = Response::new(StatusCode::Ok);
+    response.insert_header(&quot;Content-Type&quot;, &quot;application/json&quot;);
+    response.insert_header(&quot;Access-Control-Allow-Origin&quot;, &quot;*&quot;);
+    response.set_body(response_json);
+
+    Ok(response)
+}
+pub async fn get_post(req: Request&lt;State&gt;) -&gt; tide::Result {
+    let md_file_name: String = req.param(&quot;id&quot;)?.to_string();
+    let db_pool = &amp;req.state().db_pool;
+    let id = md_file_name.clone();
+    let post = query_as!(
+        PostNoID,
+        r#&quot;SELECT title, created_at FROM posts WHERE id=?&quot;#,
+        id
+    )
+    .fetch_one(db_pool)
+    .await?;
+
+    let file_content = read_md_file(&amp;md_file_name).await?;
+
+    let post_content = parse_md_content(&amp;file_content);
+
+    let response_json = json!({
+        &quot;post&quot;: NewPost{
+            created_at: post.created_at,
+            title: post.title,
+            content: post_content.content
+        },
+    });
+
+    let mut response = Response::new(StatusCode::Ok);
+    response.insert_header(&quot;Content-Type&quot;, &quot;application/json&quot;);
+    response.insert_header(&quot;Access-Control-Allow-Origin&quot;, &quot;*&quot;);
+    response.set_body(response_json);
+
+    Ok(response)
+}
+
+async fn read_md_file(file_name: &amp;str) -&gt; tide::Result&lt;String&gt; {
+    let file_path = format!(&quot;./md_files/{}.md&quot;, file_name);
+    match async_std::fs::read_to_string(file_path).await {
+        Ok(content) =&gt; Ok(content),
+        Err(e) =&gt; {
+            let error_msg = format!(&quot;Error reading MD file: {} : {}&quot;, file_name, e);
+            Err(tide::Error::new(
+                StatusCode::NotFound,
+                anyhow::Error::msg(error_msg),
+            ))
+        }
+    }
+}
+
+fn parse_md_content(content: &amp;str) -&gt; PostContent {
+    PostContent {
+        content: content.to_string(),
+    }
+}
+async fn store_md_file(id: &amp;String, content: &amp;str) -&gt; tide::Result&lt;()&gt; {
+    let file_path = format!(&quot;./md_files/{}.md&quot;, id);
+    fs::write(&amp;file_path, content)?;
+
+    Ok(())
+}
+
+pub async fn delete_post(req: Request&lt;State&gt;) -&gt; tide::Result {
+    let db_pool = &amp;req.state().db_pool;
+    let api_key = env::var(&quot;API_KEY&quot;).expect(&quot;API_KEY not found in .env&quot;);
+    let provided_key: String = req
+        .header(&quot;api-key&quot;)
+        .map(|header_values| header_values.as_str().to_string())
+        .unwrap_or_else(|| &quot;na&quot;.to_string());
+    if provided_key == api_key {
+        let uuid_param: String = req.param(&quot;uuid&quot;).unwrap_or(&quot;Error&quot;).to_string();
+        if sqlx::query!(r#&quot;DELETE FROM posts WHERE id = ?&quot;#, uuid_param)
+            .execute(db_pool)
+            .await?
+            .rows_affected()
+            &gt; 0
+        {
+            if let Err(file_error) = fs::remove_file(format!(&quot;./md_files/{}.md&quot;, uuid_param)) {
+                info!(
+                    &quot;Error deleting file: ./md_files/{}.md Error : {}&quot;,
+                    uuid_param, file_error
+                );
+                let response_json = json!({
+                    &quot;message&quot;: &quot;Error deleting file&quot;,
+                    &quot;error&quot;: file_error.to_string(),
+                });
+                let mut response = Response::new(StatusCode::InternalServerError);
+                response.insert_header(&quot;Content-Type&quot;, &quot;application/json&quot;);
+                response.insert_header(&quot;Access-Control-Allow-Origin&quot;, &quot;*&quot;);
+                response.set_body(response_json);
+
+                return Ok(response);
+            }
+
+            info!(&quot;Successfully deleted post with ID {uuid_param}&quot;);
+            let response_json = json!({
+                &quot;message&quot;: &quot;Post deleted successfully&quot;,
+            });
+
+            let mut response = Response::new(StatusCode::Ok);
+            response.insert_header(&quot;Content-Type&quot;, &quot;application/json&quot;);
+            response.insert_header(&quot;Access-Control-Allow-Origin&quot;, &quot;*&quot;);
+            response.set_body(response_json);
+
+            return Ok(response);
+        } else {
+            info!(&quot;Unsuccessfully deleted post with ID {uuid_param}&quot;);
+            // Handle the case where the post was not found
+            let response_json = json!({
+                &quot;message&quot;: &quot;Post not found&quot;,
+            });
+
+            let mut response = Response::new(StatusCode::NotFound);
+            response.insert_header(&quot;Content-Type&quot;, &quot;application/json&quot;);
+            response.insert_header(&quot;Access-Control-Allow-Origin&quot;, &quot;*&quot;);
+            response.set_body(response_json);
+
+            return Ok(response);
+        }
+    }
+
+    let response_json = json!({
+        &quot;message&quot;: &quot;Unauthorized. Invalid API key&quot;,
+    });
+
+    let mut response = Response::new(StatusCode::Unauthorized);
+    response.insert_header(&quot;Content-Type&quot;, &quot;application/json&quot;);
+    response.insert_header(&quot;Access-Control-Allow-Origin&quot;, &quot;*&quot;);
+    response.set_body(response_json);
+
+    Ok(response)
+}
+
+pub async fn create_post(mut req: Request&lt;State&gt;) -&gt; tide::Result {
+    let api_key = env::var(&quot;API_KEY&quot;).expect(&quot;API_KEY not found in .env&quot;);
+
+    let provided_key: String = req
+        .header(&quot;api-key&quot;)
+        .map(|header_values| header_values.as_str().to_string())
+        .unwrap_or_else(|| &quot;na&quot;.to_string());
+    if provided_key == api_key {
+        let new_post: NewPost = req.body_json().await?;
+        info!(&quot;Received new post - Name: {}&quot;, new_post.title);
+        let db_pool = &amp;req.state().db_pool;
+        let id = Uuid::new_v4();
+        let id_string = id.to_string();
+        info!(&quot;UUID Created {}&quot;, id_string);
+        store_md_file(&amp;id_string, &amp;new_post.content).await?;
+        let inserted_post = sqlx::query_as!(
+    Post,
+    r#&quot;INSERT INTO posts (id, title, created_at) VALUES (?, ?, ?) RETURNING id, title, created_at&quot;#,
+    id_string,
+    new_post.title,
+    new_post.created_at
+)
+    .fetch_one(db_pool)
+    .await?;
+        let response_json = json!({
+            &quot;message&quot;: &quot;Post created successfully&quot;,
+            &quot;post&quot;: inserted_post,
+        });
+
+        let mut response = Response::new(StatusCode::Created);
+        response.insert_header(&quot;Content-Type&quot;, &quot;application/json&quot;);
+        response.insert_header(&quot;Access-Control-Allow-Origin&quot;, &quot;*&quot;);
+        response.set_body(response_json);
+
+        return Ok(response);
+    }
+
+    let response_json = json!({
+        &quot;message&quot;: &quot;Unauthorized. Invalid API key&quot;,
+    });
+
+    let mut response = Response::new(StatusCode::Unauthorized);
+    response.insert_header(&quot;Content-Type&quot;, &quot;application/json&quot;);
+    response.insert_header(&quot;Access-Control-Allow-Origin&quot;, &quot;*&quot;);
+    response.set_body(response_json);
+
+    Ok(response)
+}
+</code></pre>
+
+<p>new_post.rs ( CLI tool):</p>
+
+<pre><code class="language-rust">use anyhow::{anyhow, Ok};
+use reqwest::Client;
+use reqwest::{self};
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::Read;
+use std::path::PathBuf;
+use std::{env, io};
+mod models;
+use crate::models::ApiResponse;
+use clap::{arg, command, value_parser, Command};
+
+#[tokio::main]
+async fn main() -&gt; Result&lt;(), anyhow::Error&gt; {
+    dotenv::dotenv().ok();
+
+    let matches = command!()
+        .about(&quot;Kimbell Posts - CLI to edit posts on my site&quot;)
+        .version(&quot;0.0.1&quot;)
+        .subcommand(
+            Command::new(&quot;create&quot;)
+                .about(&quot;Creates a post&quot;)
+                .arg(
+                    arg!(
+                        -n --name &lt;String&gt; &quot;Sets the name&quot;
+                    )
+                    .required(true)
+                    .value_parser(clap::value_parser!(String)),
+                )
+                .arg(
+                    arg!(
+                        -f --file &lt;FILE&gt; &quot;Sets the post file&quot;
+                    )
+                    .required(true)
+                    .value_parser(value_parser!(std::path::PathBuf)),
+                ),
+        )
+        .subcommand(
+            Command::new(&quot;delete&quot;).about(&quot;Deletes a post&quot;).arg(
+                arg!(
+                    -u --uuid &lt;String&gt; &quot;Sets the UUID&quot;
+                )
+                .required(false),
+            ),
+        )
+        .get_matches();
+
+    match matches.subcommand_name() {
+        Some(&quot;create&quot;) =&gt; {
+            let create_matches = matches.subcommand_matches(&quot;create&quot;).unwrap();
+            create_post(
+                create_matches
+                    .get_one::&lt;String&gt;(&quot;name&quot;)
+                    .unwrap()
+                    .to_string(),
+                create_matches
+                    .get_one::&lt;PathBuf&gt;(&quot;file&quot;)
+                    .unwrap()
+                    .to_path_buf(),
+            )
+            .await?;
+        }
+        Some(&quot;delete&quot;) =&gt; {
+            let delete_matches = matches.subcommand_matches(&quot;delete&quot;).unwrap();
+            delete_post(delete_matches.get_one::&lt;String&gt;(&quot;uuid&quot;).cloned()).await?;
+        }
+        _ =&gt; println!(&quot;No subcommand provided&quot;),
+    }
+    Ok(())
+}
+#[derive(Serialize, Deserialize)]
+struct NewPost {
+    content: String,
+    created_at: i64,
+    title: String,
+}
+async fn create_post(name: String, path: PathBuf) -&gt; Result&lt;(), anyhow::Error&gt; {
+    println!(&quot;Creating post with name {} and path {:?}&quot;, name, path);
+    let api_key = env::var(&quot;API_KEY&quot;).expect(&quot;API_KEY not found in .env&quot;);
+    let local = env::var(&quot;LOCAL&quot;).expect(&quot;LOCAL not found in .env&quot;);
+    let mut file = File::open(&amp;path)?;
+    let mut content = String::new();
+    file.read_to_string(&amp;mut content)?;
+
+    let date = chrono::Utc::now().timestamp();
+
+    let my_json_struct = NewPost {
+        content,
+        created_at: date,
+        title: name,
+    };
+
+    let json_body = serde_json::to_string(&amp;my_json_struct)?;
+
+    let client = Client::new();
+    let uri = match local.as_str() {
+        &quot;true&quot; =&gt; &quot;http://127.0.0.1:3000&quot;.to_string(),
+        &quot;false&quot; =&gt; &quot;https://kimbell.uk&quot;.to_string(),
+        _ =&gt; &quot;error&quot;.to_string(),
+    };
+    let response = client
+        .post(format!(&quot;{uri}/api/posts&quot;))
+        .header(&quot;api-key&quot;, api_key)
+        .body(json_body)
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        println!(&quot;File successfully uploaded!&quot;);
+        Ok(())
+    } else {
+        Err(anyhow!(
+            &quot;Failed to upload file. Status code: {}, body {}&quot;,
+            response.status(),
+            response.text().await?
+        )
+        .into())
+    }
+}
+
+async fn delete_post(uuid: Option&lt;String&gt;) -&gt; Result&lt;(), anyhow::Error&gt; {
+    match uuid {
+        Some(uuid) =&gt; {
+            println!(&quot;Deleting post {}&quot;, &amp;uuid);
+            delete_post_by_uuid(&amp;uuid).await
+        }
+        None =&gt; {
+            let api_key = env::var(&quot;API_KEY&quot;).expect(&quot;API_KEY not found in .env&quot;);
+            let client = Client::new();
+            let local = env::var(&quot;LOCAL&quot;).expect(&quot;LOCAL not found in .env&quot;);
+            let uri = match local.as_str() {
+                &quot;true&quot; =&gt; &quot;http://127.0.0.1:3000&quot;.to_string(),
+                &quot;false&quot; =&gt; &quot;https://kimbell.uk&quot;.to_string(),
+                _ =&gt; return Err(anyhow!(&quot;Invalid value for 'LOCAL' in .env&quot;)),
+            };
+
+            let api_response = client
+                .get(format!(&quot;{}/api/posts&quot;, uri))
+                .header(&quot;api-key&quot;, &amp;api_key)
+                .send()
+                .await?
+                .json::&lt;ApiResponse&gt;()
+                .await?;
+
+            let uuids: Vec&lt;(String, String)&gt; = api_response
+                .posts
+                .iter()
+                .map(|post| (post.id.clone(), post.title.clone()))
+                .collect();
+
+            if let Some((selected_uuid, selected_title)) = choose_uuid(&amp;uuids) {
+                println!(&quot;Deleting post {}: {}&quot;, &amp;selected_uuid, &amp;selected_title);
+                delete_post_by_uuid(&amp;selected_uuid).await
+            } else {
+                println!(&quot;No UUID selected. Exiting.&quot;);
+                Ok(())
+            }
+        }
+    }
+}
+
+async fn delete_post_by_uuid(uuid: &amp;str) -&gt; Result&lt;(), anyhow::Error&gt; {
+    let api_key = env::var(&quot;API_KEY&quot;).expect(&quot;API_KEY not found in .env&quot;);
+    let client = Client::new();
+    let local = env::var(&quot;LOCAL&quot;).expect(&quot;LOCAL not found in .env&quot;);
+    let uri = match local.as_str() {
+        &quot;true&quot; =&gt; &quot;http://127.0.0.1:3000&quot;.to_string(),
+        &quot;false&quot; =&gt; &quot;https://kimbell.uk&quot;.to_string(),
+        _ =&gt; return Err(anyhow!(&quot;Invalid value for 'LOCAL' in .env&quot;)),
+    };
+
+    let response = client
+        .delete(format!(&quot;{}/api/posts/{}&quot;, uri, uuid))
+        .header(&quot;api-key&quot;, &amp;api_key)
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        println!(&quot;File with UUID {} successfully deleted!&quot;, uuid);
+        Ok(())
+    } else {
+        Err(anyhow!(&quot;Failed to delete file. Status code: {}&quot;, response.status()).into())
+    }
+}
+
+fn choose_uuid(uuids: &amp;[(String, String)]) -&gt; Option&lt;(String, String)&gt; {
+    println!(&quot;Available UUIDs:&quot;);
+    for (index, (uuid, title)) in uuids.iter().enumerate() {
+        println!(&quot;{}. {}: {}&quot;, index + 1, uuid, title);
+    }
+
+    println!(&quot;Enter the number corresponding to the UUID you want to delete:&quot;);
+    let mut input = String::new();
+    io::stdin().read_line(&amp;mut input).ok()?;
+
+    if let anyhow::Result::Ok(index) = input.trim().parse::&lt;usize&gt;() {
+        if index &gt; 0 &amp;&amp; index &lt;= uuids.len() {
+            return Some(uuids[index - 1].clone());
+        }
+    }
+
+    println!(&quot;Invalid selection. Please enter a valid number.&quot;);
+    None
+}
+</code></pre>
+
+<p>There are more files on the <a href="https://github.com/seal/kimbell.uk" target="_blank">Repository Link</a> but for length&rsquo;s sake, I&rsquo;ll keep it to these two files.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>Moving from go-&gt;rust has been, interesting&hellip;
+With incredible compiler errors giving me suggestions that tell me <em>exactly</em> what I need to do, to compiler errors with little to no documentation on the internet, I find myself in a love-hate relationship with Rust.</p>
+
+<p>It&rsquo;s been a great experience to code in this language, and I will choose it for many future projects, except more-so on the large-scale ones, as where I am currently at, my speed at development is far higher in Go than Rust.</p>
+
+<p>Tide&rsquo;s simple nature is amazing, although I believe a more consistent method for database&rsquo;s needs to be adopted across http-server frameworks.</p>
+
+    </div>
+    <p> <a href="/">Back home </a>
+</body>
+
+</html>

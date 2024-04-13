@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width">
+    <title>Bun Comparison</title>
+    <link rel="canonical" href="https://kimbell.uk/">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="Will's Blog">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content>
+    <meta property="og:url" content="https://kimbell.uk/">
+    <meta name="twitter:creator" content="@bytebitter">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="/static/tomorrow-night.css">
+    <script>hljs.highlightAll();</script>
+</head>
+<style>
+    body {
+        margin-left: 25%;
+        margin-top: 5%;
+    }
+
+    @media screen and (max-width: 600px) {
+        body {
+            margin-left: 5%;
+        }
+    }
+
+    nav {
+        padding-bottom: 2%;
+    }
+
+    div {
+        padding-bottom: 2%;
+    }
+
+    a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    a:hover {
+        text-decoration: underline;
+    }
+
+    .underline {
+        text-decoration: underline;
+    }
+
+    ul {
+        list-style-type: none;
+        padding: 0;
+    }
+
+    li {
+        display: block;
+        margin-bottom: 10px;
+    }
+
+    .date {
+        color: #888;
+        margin-right: 10px;
+    }
+
+    .title {
+        display: inline;
+    }
+
+    .content-wrapper {
+        max-width: 75%;
+    }
+
+    .content-wrapper img {
+        max-width: 75%;
+        height: auto;
+    }
+</style>
+
+<body>
+    <nav>
+        <div>
+            <div><a href="/">kimbell.uk</a></div>
+        </div>
+    </nav>
+    <h4>Date: 2023-11-1</h4>
+    <div class="content-wrapper">
+        <h1 id="performance-benchmarking-of-web-runtimes-go-rust-bun-and-node-js">Performance Benchmarking of Web Runtimes: Go, Rust, Bun, and Node.js</h1>
+
+<h2 id="introduction">Introduction</h2>
+
+<p>In the ever-evolving landscape of software-development, many get stuck in the loop of what language/framework to choose. I myself had this issue when I started coding, whether to start with C, C++, Java etc. Whilst I over-came this problem, the question of which is best (fastest, dur) never left my mind. Whilst this post may contribute to your inability to choose, it was fun to make .</p>
+
+<p>Go, Rust, Bun, and Node.js. Our goal was to determine their capabilities in handling HTTP requests and JSON serialization. This test was inspired by the recent release of Bun v1.0, which showed promise as a resource-efficient runtime.</p>
+
+<p>Please note I have taken heavy inspiration from this video <a href="https://www.youtube.com/watch?v=yPcWzSlsteA" target="_blank">https://www.youtube.com/watch?v=yPcWzSlsteA</a> and this blog post <a href="https://www.priver.dev/blog/benchmark/go-vs-rust-vs-bun-vs-node-http-benchmark/" target="_blank">https://www.priver.dev/blog/benchmark/go-vs-rust-vs-bun-vs-node-http-benchmark/</a> ( check them out)</p>
+
+<h2 id="testing-environment">Testing Environment</h2>
+
+<p>Our benchmark tests were conducted locally and requests were made to localhost:3000</p>
+
+<p>Local machine specs:</p>
+
+<pre><code>AMD Ryzen 7 5800X (16) @ 3.800GHz 
+32GB ram @ 2800 Mhz
+Some wonderful M.2 drive ( https://documents.westerndigital.com/content/dam/doc-library/en_us/assets/public/western-digital/product/internal-drives/pc-sn720-ssd/data-sheet-pc-sn720-compute.pdf)
+</code></pre>
+
+<p>The software versions are as follows:</p>
+
+<pre><code>- Rust: rustc 1.74.0-nightly (bdb0fa3ee 2023-09-19)
+- Go: go version go1.21.1 linux/amd64
+- Bun: 1.0.2
+- Node.js: v20.6.1
+</code></pre>
+
+<h2 id="testing-methodology">Testing Methodology</h2>
+
+<p>We conducted one type of test initially:</p>
+
+<ol>
+<li>Take a simple request, with 4 query parameters</li>
+<li>Add them to an object</li>
+<li>&ldquo;Marshal&rdquo; / Serialise them</li>
+<li>Write it to file ( file name = uuid v4)</li>
+<li>Read from said file</li>
+<li>Return the file response</li>
+</ol>
+
+<h2 id="running-the-tests">Running the tests</h2>
+
+<p>Whilst I could individually run said tests one by one, I wanted to record metrics for the specific time-frame that the test is running and record these into a graph</p>
+
+<p>As rust has piqued my interest I chose it as my language of choice, and ran the following program ( check it out I&rsquo;m quite proud of it) <a href="https://github.com/seal/speed-test/blob/main/graphs/src/main.rs" target="_blank">https://github.com/seal/speed-test/blob/main/graphs/src/main.rs</a></p>
+
+<p>The method was simple:</p>
+
+<ol>
+<li>Start build steps if there are any</li>
+<li>Start the server</li>
+<li>Start the wrk benchmarking command ( 300s, 12 threads, 400 conns)
+WRK Command :</li>
+</ol>
+
+<pre><code class="language-rust">  TestConfig {
+            name: &quot;bun&quot;.to_string(),
+            wrk_args: vec![
+                &quot;-t12&quot;,
+                &quot;-c400&quot;,
+                &quot;-d300s&quot;,
+                &quot;http://127.0.0.1:3000/?q1=1&amp;q2=2&amp;q3=3&amp;q4=4&quot;,
+            ]
+            .into_iter()
+            .map(|s| s.into())
+            .collect(),
+            script_dir: dir_path_to_string(&quot;bun&quot;),
+            script_args: vec![&quot;index.ts&quot;].into_iter().map(|s| s.into()).collect(),
+            build_step_command: None,
+            command: &quot;bun&quot;.to_string(),
+            build_step_args: None,
+        },
+
+</code></pre>
+
+<ol>
+<li><p>Record CPU and RAM values and record into a graph to be later viewed</p></li>
+
+<li><p>Drop the server, wait approx 15 seconds for i/o to be stopped ( Go and Rust don&rsquo;t like to shut-down immediately, sending a pkill/kill command works, but we need to wait for i/o anyway)</p></li>
+
+<li><p>Rinse and repeat</p>
+
+<h2 id="local-test-results">Local Test Results</h2></li>
+</ol>
+
+<p>The full wrk outputs are in the github repo, link here:
+<a href="https://github.com/seal/speed-test/tree/main" target="_blank">https://github.com/seal/speed-test/tree/main</a>
+But the main result we&rsquo;re looking at is reqs/s and total</p>
+
+<p>Results: ( CPU = RED, RAM = BLUE)</p>
+
+<pre><code>Bun  - 1.97k/s - 7041644
+</code></pre>
+
+<p><img src="https://github.com/seal/speed-test/blob/main/results/local/initial_bun_usage.png?raw=true" alt="" /></p>
+
+<pre><code>Go   - 4.33k/s - 15510114
+</code></pre>
+
+<p><img src="https://github.com/seal/speed-test/blob/main/results/local/go_usage.png?raw=true" alt="" /></p>
+
+<pre><code>Rust - 5.20k/s - 18615033
+</code></pre>
+
+<p><img src="https://github.com/seal/speed-test/blob/main/results/local/rust_usage.png?raw=true" alt="" /></p>
+
+<pre><code>Node - 2.22k/s - 7954136
+</code></pre>
+
+<p><img src="https://github.com/seal/speed-test/blob/main/results/local/node_usage.png?raw=true" alt="" /></p>
+
+<p>Yes, you read that right, node was <em>faster</em> than bun</p>
+
+<p>Why ?</p>
+
+<p>I only had one possible answer, query parameters</p>
+
+<pre><code class="language-javascript">const { searchParams } = new URL(req.url)
+const id = uuidv4();
+const responseJson = {
+	q1: searchParams.get(&quot;q1&quot;),
+	q2: searchParams.get(&quot;q2&quot;),
+	q3: searchParams.get(&quot;q3&quot;),
+	q4: searchParams.get(&quot;q4&quot;),
+};
+</code></pre>
+
+<p>I decided to change this code to</p>
+
+<pre><code class="language-javascript">const parsedUrl = url.parse(req.url);
+const queryParamsString = parsedUrl.query;
+const queryParams = querystring.parse(queryParamsString);
+const id = uuidv4();
+const responseJson = {
+	q1: queryParams.q1,
+	q2: queryParams.q2,
+	q3: queryParams.q3,
+	q4: queryParams.q4,
+};
+</code></pre>
+
+<p>and re-run the test&hellip;</p>
+
+<p>The result?</p>
+
+<pre><code>Running 5m test @ http://127.0.0.1:3000/?q1=1&amp;q2=2&amp;q3=3&amp;q4=4
+  12 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    20.22ms    1.41ms  48.26ms   76.61%
+    Req/Sec     1.64k    96.88     3.59k    84.79%
+  5874953 requests in 5.00m, 857.23MB read
+Requests/sec:  19579.00
+Transfer/sec:      2.86MB
+</code></pre>
+
+<p><em>It got worse</em>
+Now here I&rsquo;m a little confused, so I decided to re-run all of the tests again, thinking the 2% cpu usage from spotify might be affecting my results, or possibly node / rust / go was not shutting down properly, I also moved bun to <em>run first</em></p>
+
+<p>Bun:</p>
+
+<pre><code>Running 5m test @ http://127.0.0.1:3000/?q1=1&amp;q2=2&amp;q3=3&amp;q4=4
+  12 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    20.17ms    1.36ms  46.92ms   77.03%
+    Req/Sec     1.64k    93.89     2.00k    85.22%
+  5890346 requests in 5.00m, 859.47MB read
+Requests/sec:  19630.93
+Transfer/sec:      2.86MB
+</code></pre>
+
+<p>Node:</p>
+
+<pre><code>Running 5m test @ http://127.0.0.1:3000/?q1=1&amp;q2=2&amp;q3=3&amp;q4=4
+  12 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    14.92ms    3.53ms 344.78ms   99.72%
+    Req/Sec     2.23k    79.48     3.03k    76.54%
+  7996381 requests in 5.00m, 1.57GB read
+Requests/sec:  26648.65
+Transfer/sec:      5.36MB
+</code></pre>
+
+<p>Well, that&rsquo;s weird, being myself not a javascript programmer I initially put this down to bad code.
+Along with this, bun was not deleting all the files?
+I was left with 100-200 files remaining after the program had completed it&rsquo;s run.</p>
+
+<p>Now my only conclusion left was <em>bun was bad at query parameters regardless of library / method</em></p>
+
+<p>I removed the need for query parameters and just making the request to localhost:3000/ then re-ran my tests
+Bun:</p>
+
+<pre><code>Running 5m test @ http://127.0.0.1:3000/
+  12 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    15.71ms    1.23ms  38.00ms   75.57%
+    Req/Sec     2.11k   156.77     3.04k    67.74%
+  7562611 requests in 5.00m, 1.08GB read
+Requests/sec:  25204.39
+Transfer/sec:      3.68MB
+</code></pre>
+
+<p><img src="https://github.com/seal/speed-test/blob/main/results/local/bun_no_params_usage.png?raw=true" alt="" />
+Node:</p>
+
+<pre><code>Running 5m test @ http://127.0.0.1:3000/
+  12 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    15.24ms    3.32ms 336.85ms   99.81%
+    Req/Sec     2.18k    73.56     3.18k    71.07%
+  7826277 requests in 5.00m, 1.54GB read
+Requests/sec:  26082.39
+Transfer/sec:      5.25MB
+</code></pre>
+
+<p><img src="https://github.com/seal/speed-test/blob/main/results/local/node_no_params_usage.png?raw=true" alt="" /></p>
+
+<p>Bun was slower, <em>again</em></p>
+
+<p>I then re-made the tests to do a 30 second test, as due to the ram usage I assumed this was a garbage collector issue</p>
+
+<p>The result ?
+Bun:</p>
+
+<pre><code>Running 30s test @ http://127.0.0.1:3000/
+  12 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    15.49ms    1.17ms  34.88ms   74.94%
+    Req/Sec     2.14k   158.38     2.33k    41.53%
+  767184 requests in 30.02s, 111.94MB read
+Requests/sec:  25557.37
+Transfer/sec:      3.73MB
+</code></pre>
+
+<p><img src="https://github.com/seal/speed-test/blob/main/results/local/30s_bun_no_params.png?raw=true" alt="" />
+Node:</p>
+
+<pre><code>Running 30s test @ http://127.0.0.1:3000/
+  12 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    16.56ms   10.98ms 350.33ms   99.46%
+    Req/Sec     2.08k   136.75     3.22k    92.52%
+  744045 requests in 30.01s, 149.72MB read
+Requests/sec:  24793.63
+Transfer/sec:      4.99MB
+</code></pre>
+
+<p><img src="https://github.com/seal/speed-test/blob/main/results/local/30s_node_no_params.png?raw=true" alt="" /></p>
+
+<h2 id="code">Code</h2>
+
+<p>All the code from this project can be found here
+<a href="https://github.com/seal/speed-test" target="_blank">https://github.com/seal/speed-test</a>
+Please critique this code, as I believe my test results may be skewed due to incorrect code.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>Our benchmarking results reveal some interesting things, rust at #1, go close #2
+But interestingly enough bun does not perform as well as node in some situations ( most from my tests)</p>
+
+<p>Whilst I chose a more extensive testing method than others, I believe there could be some issues with my bun code leading to these results.</p>
+
+<p>All in all, rust will continue to be used for my personal projects, Go for clients and I&rsquo;m going to continue to do this sort of testing on new &ldquo;faster&rdquo; frameworks that collect all of the hype.</p>
+
+<h2 id="feedback">Feedback</h2>
+
+<p>I welcome feedback and discussion on these findings. You can reach out to me on Twitter at <a href="https://twitter.com/bytebitter" target="_blank">https://twitter.com/bytebitter</a> for any questions or comments.</p>
+
+    </div>
+    <p> <a href="/">Back home </a>
+</body>
+
+</html>
