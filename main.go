@@ -48,6 +48,9 @@ func main() {
 	r.HandleFunc("/", handlers.IndexHandler)
 	r.HandleFunc("/posts/{url}", handlers.GetPost).Methods("GET")
 	r.HandleFunc("/index.html", handlers.IndexHandler)
+	r.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "favicon.ico")
+	})
 	r.HandleFunc("/tomorrow-night.css", func(w http.ResponseWriter, r *http.Request) {
 		css, err := os.ReadFile("tomorrow-night.css")
 		if err != nil {
