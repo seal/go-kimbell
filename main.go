@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/seal/go-kimbell/pkg/handlers"
+	"github.com/seal/go-kimbell/pkg/utils"
 )
 
 // Test via
@@ -27,6 +28,12 @@ import (
 */
 
 func main() {
+
+	err := utils.GeneratePosts()
+	if err != nil {
+		slog.Error("Failed to generate posts", err)
+		return
+	}
 	file, err := os.OpenFile("log.json", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		slog.Error("Failed to open log file", err)

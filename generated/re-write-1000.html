@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width">
+    <title>minimalism</title>
+    <link rel="canonical" href="https://kimbell.uk/">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="Will's Blog">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content>
+    <meta property="og:url" content="https://kimbell.uk/">
+    <meta name="twitter:creator" content="@bytebitter">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="/static/tomorrow-night.css">
+    <script>hljs.highlightAll();</script>
+</head>
+<style>
+    body {
+        margin-left: 25%;
+        margin-top: 5%;
+    }
+
+    @media screen and (max-width: 600px) {
+        body {
+            margin-left: 5%;
+        }
+    }
+
+    nav {
+        padding-bottom: 2%;
+    }
+
+    div {
+        padding-bottom: 2%;
+    }
+
+    a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    a:hover {
+        text-decoration: underline;
+    }
+
+    .underline {
+        text-decoration: underline;
+    }
+
+    ul {
+        list-style-type: none;
+        padding: 0;
+    }
+
+    li {
+        display: block;
+        margin-bottom: 10px;
+    }
+
+    .date {
+        color: #888;
+        margin-right: 10px;
+    }
+
+    .title {
+        display: inline;
+    }
+
+    .content-wrapper {
+        max-width: 75%;
+    }
+
+    .content-wrapper img {
+        max-width: 75%;
+        height: auto;
+    }
+</style>
+
+<body>
+    <nav>
+        <div>
+            <div><a href="/">kimbell.uk</a></div>
+        </div>
+    </nav>
+    <h4>Date: 2024-04-13</h4>
+    <div class="content-wrapper">
+        <h2 id="a-constant-re-write">A constant re-write &hellip;</h2>
+
+<p>After little activity on my re-write of this blog I noticed something that hadn&rsquo;t occurred to me previously.</p>
+
+<p>In the process of over-engineering a simple blog, using new technologies to me ( Vue.js ) and an unfamiliar framework in rust ( Tide) I had removed my <em>want</em> to update this site.</p>
+
+<p>Code that had left my mind, and a framework that hurt my brain&hellip;</p>
+
+<p>The obvious solution to me ? Yet <em>another</em> re-write,but with the aim for it to be my last complete re-write.</p>
+
+<h2 id="the-minimalist-approach">The Minimalist Approach</h2>
+
+<p>I&rsquo;ve tried JS frameworks, Angular, React &amp; Vue.js to be specific, I always find myself with hours and hours of work with a finished problem but a weird feeling.</p>
+
+<p>The feeling that I didn&rsquo;t accomplish anything.</p>
+
+<p>After some thought and a few weeks it hit me, after a quick Google search I discovered the terminology for what felt wrong.</p>
+
+<pre><code> Glue engineering
+</code></pre>
+
+<p>The frameworks and work I had done didn&rsquo;t feel like building, it felt like gluing a large majority of technologies I didn&rsquo;t write, nor do I understand into a mammoth of a dist file&hellip;</p>
+
+<p>With this in mind, I decided my next front-end en devour would be minimalist, much like the original version of this site.</p>
+
+<p>By adopting a minimalist approach, I aimed to:</p>
+
+<ul>
+<li>Reduce complexity and maintain a clean codebase</li>
+<li>Improve performance by eliminating unnecessary overhead</li>
+<li>Enhance maintainability and ease of understanding</li>
+<li>Focus on the essential features of a blog</li>
+</ul>
+
+<h2 id="the-technology-stack">The Technology Stack</h2>
+
+<p>To align with this new founded idea, I chose the below stack for various reasons:</p>
+
+<ul>
+<li><strong>Go</strong>: Large familiarity, <em>speed</em> &amp; low complexity.</li>
+<li><strong>Gorilla Mux</strong>: Established, mature, and I have not yet tried <a href="https://tip.golang.org/doc/go1.22" target="_blank">https://tip.golang.org/doc/go1.22</a></li>
+<li><strong>Markdown</strong>: All my previous posts have been written in markdown, but the goal this time is for the ability to <em>edit without editing a database</em>. For quick, smaller changes</li>
+<li><strong>gomarkdown</strong>: A Go library for converting Markdown to HTML, gomarkdown simplifies the rendering process.</li>
+</ul>
+
+<h2 id="the-architecture">The Architecture</h2>
+
+<p>The architecture of the blog service follows a straightforward and minimalist design:</p>
+
+<ol>
+<li><p><strong>HTTP Handlers</strong>: The endpoints should be simple ( there&rsquo;s only 5) which are:</p>
+
+<ol>
+<li>r.HandleFunc(&ldquo;/api/new&rdquo;, handlers.NewPost).Methods(&ldquo;POST&rdquo;)</li>
+<li>r.HandleFunc(&ldquo;/&rdquo;, handlers.IndexHandler)</li>
+<li>r.HandleFunc(&ldquo;/posts/{url}&rdquo;, handlers.GetPost).Methods(&ldquo;GET&rdquo;)</li>
+<li>r.HandleFunc(&ldquo;/index.html&rdquo;, handlers.IndexHandler)</li>
+<li>r.HandleFunc(&ldquo;/tomorrow-night.css&rdquo;, &hellip;&hellip;..)</li>
+</ol></li>
+
+<li><p><strong>Post Storage</strong>: Posts will be stored as .md files with a corresponding .json file, with the added benefit of being re-generated upon each start of the server.</p></li>
+
+<li><p><strong>Templates</strong>: Go&rsquo;s text/template is a no-brainer, a simple yet mature templating library, as I do not need extra features.</p></li>
+
+<li><p><strong>Slog</strong>: I&rsquo;ve used zap, log, etc etc and need something not as <em>fast and engineered</em> as Zap by Uber, but with better control &amp; debug levels, for this I settled on Slog.</p></li>
+</ol>
+
+<h2 id="the-code">The code</h2>
+
+<h4 id="logging">Logging</h4>
+
+<p>Keeping it simple, my logging configuration is as follows:</p>
+
+<pre><code class="language-go">	file, err := os.OpenFile(&quot;log.json&quot;, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		slog.Error(&quot;Failed to open log file&quot;, err)
+		os.Exit(1)
+	}
+	defer file.Close()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(io.MultiWriter(file, os.Stdout), &amp;slog.HandlerOptions{
+		Level: slog.LevelInfo})))
+</code></pre>
+
+<p>StdOut &amp; file logging in a nice json format, for example:</p>
+
+<pre><code class="language-json">{&quot;time&quot;:&quot;2024-04-13T14:54:37.240131824+01:00&quot;,&quot;level&quot;:&quot;INFO&quot;,&quot;msg&quot;:&quot;Starting server&quot;}
+
+</code></pre>
+
+<h4 id="index-ep">Index ep:</h4>
+
+<p><img src="https://img.kimbell.uk/gPJQ99.png" alt="https://img.kimbell.uk/gPJQ99.png" /></p>
+
+<ol>
+<li>Get Posts returns an array of Post{} with information of the posts normally, but here we are using the time of the most recently modified post.</li>
+<li>Parse index re-gen&rsquo;s index.html ( Which we only do if a post has been modified)</li>
+</ol>
+
+<h4 id="newpost">NewPost</h4>
+
+<p>NewPost is not too interesting, some json marshalling, validation &amp; writing the .json and .md file</p>
+
+<p><img src="https://img.kimbell.uk/gDQ9GB.png" alt="https://img.kimbell.uk/gDQ9GB.png" /></p>
+
+<p>&hellip;etc etc etc</p>
+
+<h4 id="get-post">Get Post</h4>
+
+<p>Simple yet again, read a file, return it</p>
+
+<p><img src="https://img.kimbell.uk/TDEQTC.png" alt="https://img.kimbell.uk/TDEQTC.png" /></p>
+
+<h4 id="utils">Utils</h4>
+
+<p>The most interesting part of this is in our util package, the functions which turn MD to HTML. Using <a href="github.com/gomarkdown/markdown" target="_blank">github.com/gomarkdown/markdown</a> for our html generation with a couple short functions</p>
+
+<h5 id="generate-posts">Generate Posts</h5>
+
+<pre><code class="language-go">func GeneratePosts() error {
+	posts, _, err := GetPosts()
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(&quot;generated&quot;, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	for _, post := range posts {
+		markdownFileName := filepath.Join(&quot;posts&quot;, post.Url+&quot;.md&quot;)
+		markdownData, err := os.ReadFile(markdownFileName)
+		if err != nil {
+			return err
+		}
+
+		htmlContent := mdToHTML(markdownData)
+
+		tem, err := os.ReadFile(&quot;templates/post.html&quot;)
+		if err != nil {
+			return err
+		}
+		tmpl := template.Must(template.New(&quot;post&quot;).Parse(string(tem)))
+		var buf bytes.Buffer
+		err = tmpl.Execute(&amp;buf, struct {
+			Title   string
+			Date    string
+			Content template.HTML
+		}{
+			Title:   post.Title,
+			Date:    post.Date,
+			Content: template.HTML(htmlContent),
+		})
+		if err != nil {
+			return err
+		}
+
+		htmlFileName := filepath.Join(&quot;generated&quot;, post.Url+&quot;.html&quot;)
+		err = os.WriteFile(htmlFileName, buf.Bytes(), 0644)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+</code></pre>
+
+<h5 id="md-to-html">MD To Html</h5>
+
+<pre><code class="language-go">func mdToHTML(md []byte) []byte {
+	extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
+	p := parser.NewWithExtensions(extensions)
+	doc := p.Parse(md)
+
+	htmlFlags := html.CommonFlags | html.HrefTargetBlank
+	opts := html.RendererOptions{Flags: htmlFlags}
+	renderer := html.NewRenderer(opts)
+
+	return markdown.Render(doc, renderer)
+}
+
+</code></pre>
+
+<h4 id="tests">Tests</h4>
+
+<p>Just kidding&hellip; you&rsquo;re not going to read that
+Although if you wanted to you can find the repo here:
+<a href="https://github.com/seal/go-kimbell" target="_blank">https://github.com/seal/go-kimbell</a></p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>All in all this was a fairly rewarding experience leaving a good feeling in my mind.A minimalist front-end ( which I have intentionally left out, you&rsquo;re currently using it) and a simple yet effective go backend leading to what I feel like is a finished product ( minus the possibility of a read counter ? )</p>
+
+<p>I think going forward I&rsquo;ll be adopting this simple mentality more often than not, as I have spent many an hour confused over my <em>own code</em> from as little as 2-3 months ago.</p>
+
+    </div>
+    <p> <a href="/">Back home </a>
+</body>
+
+</html>
