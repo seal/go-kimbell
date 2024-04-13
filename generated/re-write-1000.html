@@ -13,10 +13,7 @@
     <meta property="og:image" content>
     <meta property="og:url" content="https://kimbell.uk/">
     <meta name="twitter:creator" content="@bytebitter">
-    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/default.min.css">
-    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
-    <link rel="stylesheet" href="/static/tomorrow-night.css">
-    <script>hljs.highlightAll();</script>
+    
 </head>
 <style>
     body {
@@ -52,12 +49,10 @@
     }
 
     ul {
-        list-style-type: none;
         padding: 0;
     }
 
     li {
-        display: block;
         margin-bottom: 10px;
     }
 
@@ -96,7 +91,7 @@
 
 <p>Code that had left my mind, and a framework that hurt my brain&hellip;</p>
 
-<p>The obvious solution to me ? Yet <em>another</em> re-write,but with the aim for it to be my last complete re-write.</p>
+<p>The obvious solution to me ? Yet <em>another</em> re-write, but with the aim for it to be my last.</p>
 
 <h2 id="the-minimalist-approach">The Minimalist Approach</h2>
 
@@ -104,7 +99,7 @@
 
 <p>The feeling that I didn&rsquo;t accomplish anything.</p>
 
-<p>After some thought and a few weeks it hit me, after a quick Google search I discovered the terminology for what felt wrong.</p>
+<p>After some thought and a discussion with a friend it hit me, I hated</p>
 
 <pre><code> Glue engineering
 </code></pre>
@@ -138,7 +133,7 @@
 <p>The architecture of the blog service follows a straightforward and minimalist design:</p>
 
 <ol>
-<li><p><strong>HTTP Handlers</strong>: The endpoints should be simple ( there&rsquo;s only 5) which are:</p>
+<li><p><strong>HTTP Handlers</strong>: The endpoints should be simple ( there&rsquo;s only 5 - technically 4 ) which are:</p>
 
 <ol>
 <li>r.HandleFunc(&ldquo;/api/new&rdquo;, handlers.NewPost).Methods(&ldquo;POST&rdquo;)</li>

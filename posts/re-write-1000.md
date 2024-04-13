@@ -5,7 +5,7 @@ In the process of over-engineering a simple blog, using new technologies to me (
 
 Code that had left my mind, and a framework that hurt my brain...
 
-The obvious solution to me ? Yet *another* re-write,but with the aim for it to be my last complete re-write.
+The obvious solution to me ? Yet *another* re-write, but with the aim for it to be my last.
 
 ## The Minimalist Approach
 
@@ -13,7 +13,7 @@ I've tried JS frameworks, Angular, React & Vue.js to be specific, I always find 
 
 The feeling that I didn't accomplish anything.
 
-After some thought and a few weeks it hit me, after a quick Google search I discovered the terminology for what felt wrong.
+After some thought and a discussion with a friend it hit me, I hated 
 
 	 Glue engineering
 
@@ -40,11 +40,11 @@ To align with this new founded idea, I chose the below stack for various reasons
 
 The architecture of the blog service follows a straightforward and minimalist design:
 
-1. **HTTP Handlers**: The endpoints should be simple ( there's only 5) which are:
+1. **HTTP Handlers**: The endpoints should be simple ( there's only 5 - technically 4 ) which are:
 	1. r.HandleFunc("/api/new", handlers.NewPost).Methods("POST")
 	2. r.HandleFunc("/", handlers.IndexHandler)
 	3. r.HandleFunc("/posts/{url}", handlers.GetPost).Methods("GET")
-	4. r.HandleFunc("/index.html", handlers.IndexHandler)
+	4. r.HandleFunc("/index.html", handlers.IndexHandler) 
 	5. r.HandleFunc("/tomorrow-night.css", ........)
 
 2. **Post Storage**: Posts will be stored as .md files with a corresponding .json file, with the added benefit of being re-generated upon each start of the server.
