@@ -52,12 +52,12 @@ func ParseIndex() error {
 		return err
 	}
 
-	err = os.MkdirAll("generated", os.ModePerm)
+	err = os.MkdirAll("static", os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	err = os.WriteFile("generated/index.html", buf.Bytes(), 0644)
+	err = os.WriteFile("static/index.html", buf.Bytes(), 0644)
 	if err != nil {
 		slog.Error(err.Error())
 		return err
@@ -71,7 +71,7 @@ func GeneratePosts() error {
 		return err
 	}
 
-	err = os.MkdirAll("generated", os.ModePerm)
+	err = os.MkdirAll("static", os.ModePerm)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func GeneratePosts() error {
 			return err
 		}
 
-		htmlFileName := filepath.Join("generated", post.Url+".html")
+		htmlFileName := filepath.Join("static", post.Url+".html")
 		err = os.WriteFile(htmlFileName, buf.Bytes(), 0644)
 		if err != nil {
 			return err

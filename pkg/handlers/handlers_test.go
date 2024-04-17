@@ -105,11 +105,11 @@ func TestGetPost(t *testing.T) {
 		// Delete test post files
 		os.Remove("posts/test-post.json")
 		os.Remove("posts/test-post.md")
-		os.Remove("generated/test-post.html")
+		os.Remove("static/test-post.html")
 	}()
 }
 func TestIndexPageChange(t *testing.T) {
-	initialIndexContent, err := os.ReadFile("generated/index.html")
+	initialIndexContent, err := os.ReadFile("static/index.html")
 	if err != nil {
 		t.Fatalf("Failed to read initial index page: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestIndexPageChange(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 
-	updatedIndexContent, err := os.ReadFile("generated/index.html")
+	updatedIndexContent, err := os.ReadFile("static/index.html")
 	if err != nil {
 		t.Fatalf("Failed to read updated index page: %v", err)
 	}
@@ -162,6 +162,6 @@ func TestIndexPageChange(t *testing.T) {
 		// Delete test post files
 		os.Remove("posts/test-post.json")
 		os.Remove("posts/test-post.md")
-		os.Remove("generated/test-post.html")
+		os.Remove("static/test-post.html")
 	}()
 }

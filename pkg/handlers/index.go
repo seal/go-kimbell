@@ -27,7 +27,7 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		lastGenerationTime = latestModTime
 	}
-	http.ServeFile(w, r, "generated/index.html")
+	http.ServeFile(w, r, "static/index.html")
 }
 
 var lastGenerationTime time.Time
