@@ -49,6 +49,7 @@ func main() {
 	r.Use(metrics.Middleware)
 	r.HandleFunc("/api/new", handlers.NewPost).Methods("POST")
 	r.HandleFunc("/", handlers.IndexHandler)
+	r.HandleFunc("/metrics", handlers.MetricsHandler)
 	r.HandleFunc("/index.html", handlers.IndexHandler)
 	/*
 		r.HandleFunc("/posts/{url}", handlers.GetPost).Methods("GET")
