@@ -74,7 +74,7 @@ func main() {
 	r.PathPrefix("/posts/").Handler(http.StripPrefix("/posts/", postFileServer))
 	srv := &http.Server{
 		Handler:      r,
-		Addr:         "0.0.0.0:3000",
+		Addr:         "0.0.0.0:3003",
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
